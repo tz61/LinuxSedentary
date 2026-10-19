@@ -122,8 +122,13 @@ void snapshots(const QString &theme)
     breakWindow.showBreak(5 * 60, false);
     breakWindow.updateBreak(3 * 60 + 12, true);
     saveWidget(&breakWindow, QStringLiteral("break-countdown-") + theme);
+    const int breakHeight = breakWindow.height();
     breakWindow.showDone(QStringLiteral("45 min"));
     saveWidget(&breakWindow, QStringLiteral("break-done-") + theme);
+    if (breakWindow.height() >= breakHeight) {
+        std::fprintf(stderr, "FAIL the done card did not shrink (%d >= %d)\n", breakWindow.height(), breakHeight);
+        ++g_failures;
+    }
     breakWindow.dismiss();
 
     QTemporaryDir dir;

@@ -5,6 +5,7 @@
 #include "icons.h"
 
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QCursor>
 #include <QFrame>
 #include <QGraphicsDropShadowEffect>
@@ -324,6 +325,10 @@ void BreakWindow::present(bool fullscreen)
     } else {
         if (windowState() & Qt::WindowFullScreen)
             setWindowState(Qt::WindowNoState);
+        // Children were just shown or hidden; apply that before measuring
+        // so the window also shrinks (e.g. countdown -> "Break complete").
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
+        m_card->layout()->activate();
         layout()->activate();
         resize(sizeHint());
         const QRect area = screen->availableGeometry();
