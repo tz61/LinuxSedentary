@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QIcon>
 #include <QProcess>
 #include <QSaveFile>
 #include <QSet>
@@ -79,6 +80,45 @@ void playWith(const QString &file, int index)
     QApplication::beep();
 }
 
+// Copies a Qt resource to ~/.cache/sedentary-reminder/<name> for programs
+// that need a real file. Checked once per run; rewritten when missing or
+// different (another version).
+QString cachedResource(const QString &resourcePath, const QString &name)
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
+        + QStringLiteral("/" APP_ID);
+    const QString path = dir + QLatin1Char('/') + name;
+    static QSet<QString> verified;
+    if (verified.contains(path) && QFileInfo::exists(path))
+        return path;
+
+    QFile resource(resourcePath);
+    if (!resource.open(QIODevice::ReadOnly))
+        return {};
+    const QByteArray data = resource.readAll();
+    QFile existing(path);
+    if (!existing.open(QIODevice::ReadOnly) || existing.readAll() != data) {
+        existing.close();
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        QSaveFile out(path);
+        if (!out.open(QIODevice::WriteOnly) || out.write(data) != data.size() || !out.commit())
+            return {};
+    }
+    verified.insert(path);
+    return path;
+}
+
+// The icon named in notifications. A development build runs before the
+// icon is installed; naming it then makes KDE cache the failed lookup until
+// it restarts, so hand over the file instead.
+QString notificationIcon()
+{
+    if (QIcon::hasThemeIcon(QStringLiteral(APP_ID)))
+        return QStringLiteral(APP_ID);
+    const QString file = cachedResource(QStringLiteral(":/icons/" APP_ID ".svg"), QStringLiteral(APP_ID ".svg"));
+    return file.isEmpty() ? QString() : file;
+}
+
 } // namespace
 
 Notifier::Notifier(QObject *parent)
@@ -134,7 +174,7 @@ void Notifier::show(const QString &summary, const QString &body, const QVector<A
     hints.insert(QStringLiteral("suppress-sound"), true);
 
     QDBusMessage msg = QDBusMessage::createMethodCall(kService, kPath, kService, QStringLiteral("Notify"));
-    msg.setArguments({QStringLiteral("Sedentary Reminder"), m_id, QStringLiteral(APP_ID), summary, body,
+    msg.setArguments({QStringLiteral("Sedentary Reminder"), m_id, notificationIcon(), summary, body,
                       actionList, hints, timeoutMs});
     const QDBusMessage reply = QDBusConnection::sessionBus().call(msg, QDBus::Block, 2000);
     if (reply.type() == QDBusMessage::ReplyMessage && !reply.arguments().isEmpty())
@@ -165,30 +205,8 @@ void Notifier::onClosed(uint id, uint)
 
 QString Notifier::soundFile(Sound sound)
 {
-    const QString name = QLatin1String(soundName(sound));
-    const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
-        + QStringLiteral("/" APP_ID "/sounds");
-    const QString path = dir + QLatin1Char('/') + name + QStringLiteral(".wav");
-
-    // Checked once per run; rewritten when missing or from another version.
-    static QSet<QString> verified;
-    if (verified.contains(name) && QFileInfo::exists(path))
-        return path;
-
-    QFile resource(QStringLiteral(":/sounds/") + name + QStringLiteral(".wav"));
-    if (!resource.open(QIODevice::ReadOnly))
-        return {};
-    const QByteArray data = resource.readAll();
-    QFile existing(path);
-    if (!existing.open(QIODevice::ReadOnly) || existing.readAll() != data) {
-        existing.close();
-        QDir().mkpath(dir);
-        QSaveFile out(path);
-        if (!out.open(QIODevice::WriteOnly) || out.write(data) != data.size() || !out.commit())
-            return {};
-    }
-    verified.insert(name);
-    return path;
+    const QString name = QLatin1String(soundName(sound)) + QStringLiteral(".wav");
+    return cachedResource(QStringLiteral(":/sounds/") + name, QStringLiteral("sounds/") + name);
 }
 
 void Notifier::play(Sound sound)

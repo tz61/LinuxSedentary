@@ -159,6 +159,13 @@ refresh_menus() {
         gtk-update-icon-cache -q -f -t "$hicolor" 2>/dev/null || true
     fi
     [ -d "$hicolor" ] && touch "$hicolor"
+    # Running KDE apps (the desktop, the menu) cache icon lookups, including
+    # failed ones; ask them to reload so the new icon shows up right away.
+    if have gdbus; then
+        gdbus emit --session --object-path /KIconLoader --signal org.kde.KIconLoader.iconChanged 0 >/dev/null 2>&1 || true
+    elif have dbus-send; then
+        dbus-send --session --type=signal /KIconLoader org.kde.KIconLoader.iconChanged int32:0 >/dev/null 2>&1 || true
+    fi
     # KDE rebuilds its menu cache on its own, but this makes it immediate.
     for sycoca in kbuildsycoca6 kbuildsycoca5; do
         if have "$sycoca"; then
@@ -305,7 +312,10 @@ install_app() {
         if [ -d "$DESKTOP_DIR" ]; then
             # Desktops only run launchers that are executable (KDE, Xfce)
             # or marked trusted (GNOME).
-            install -m 755 "$DESKTOP_FILE" "$SHORTCUT_FILE"
+            # The icon by file path: works even where the icon theme is
+            # not rescanned for new icons.
+            sed "s|^Icon=.*|Icon=$ICON_FILE|" "$DESKTOP_FILE" >"$SHORTCUT_FILE"
+            chmod 755 "$SHORTCUT_FILE"
             if have gio; then
                 gio set "$SHORTCUT_FILE" metadata::trusted true >/dev/null 2>&1 || true
             fi
