@@ -2,7 +2,6 @@
 
 #include <QDBusConnection>
 #include <QDBusMessage>
-#include <QDBusVariant>
 #include <QGuiApplication>
 #include <QLibrary>
 
