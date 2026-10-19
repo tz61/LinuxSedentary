@@ -40,11 +40,13 @@ This builds a release binary, runs the tests and installs
 | program | `~/.local/bin/sedentary-reminder` |
 | menu launcher | `~/.local/share/applications/sedentary-reminder.desktop` |
 | icon | `~/.local/share/icons/hicolor/scalable/apps/sedentary-reminder.svg` |
+| desktop shortcut | `~/Desktop/sedentary-reminder.desktop` (your XDG desktop folder) |
 | start at login (optional) | `~/.config/autostart/sedentary-reminder.desktop` |
 
 then starts the app. It asks whether to start at login; `--autostart` /
-`--no-autostart` answer up front. Other options: `--prefix DIR`, `--qt DIR`,
-`--no-launch`, `--skip-tests`; see `./install.sh --help`.
+`--no-autostart` answer up front. You can change it any time with *Start at
+login* in the tray menu, in Settings, or with `sedentary-reminder --autostart on|off`. Other options: `--prefix DIR`, `--qt DIR`,
+`--no-desktop-icon`, `--no-launch`, `--skip-tests`; see `./install.sh --help`.
 
 Running it again upgrades in place and restarts a running instance.
 

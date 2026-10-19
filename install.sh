@@ -15,6 +15,7 @@ DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 QT_DIR=""
 AUTOSTART=""   # on, off or empty (ask when interactive)
 LAUNCH=1
+DESKTOP_ICON=1
 RUN_TESTS=1
 MODE=install
 PURGE=0
@@ -33,6 +34,7 @@ Options:
   --autostart      start it automatically at login
   --no-autostart   do not start it at login (removes an existing entry)
   --no-launch      do not start it after installing
+  --no-desktop-icon  do not put a shortcut on the desktop
   --skip-tests     do not build or run the tests
   --uninstall      remove the installed files (keeps settings and statistics)
   --purge          with --uninstall: also delete settings and statistics
@@ -62,6 +64,7 @@ while [ $# -gt 0 ]; do
         --autostart) AUTOSTART=on ;;
         --no-autostart) AUTOSTART=off ;;
         --no-launch) LAUNCH=0 ;;
+        --no-desktop-icon) DESKTOP_ICON=0 ;;
         --skip-tests) RUN_TESTS=0 ;;
         --uninstall) MODE=uninstall ;;
         --purge) PURGE=1 ;;
@@ -79,33 +82,55 @@ BIN="$PREFIX/bin/$APP"
 DESKTOP_FILE="$PREFIX/share/applications/$APP.desktop"
 ICON_FILE="$PREFIX/share/icons/hicolor/scalable/apps/$APP.svg"
 AUTOSTART_FILE="$CONFIG_HOME/autostart/$APP.desktop"
+DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+[ -n "$DESKTOP_DIR" ] && [ "$DESKTOP_DIR" != "$HOME" ] || DESKTOP_DIR="$HOME/Desktop"
+SHORTCUT_FILE="$DESKTOP_DIR/$APP.desktop"
 
 # --- Running instance ------------------------------------------------------------
 
-instance_running() {
+# PID of the running instance (whoever owns the D-Bus name), if any.
+instance_pid() {
+    local out=""
     if have gdbus; then
-        gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
-            --method org.freedesktop.DBus.NameHasOwner "$DBUS_NAME" 2>/dev/null | grep -q true
+        out="$(gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
+            --method org.freedesktop.DBus.GetConnectionUnixProcessID "$DBUS_NAME" 2>/dev/null)" || return 1
+        out="${out#*uint32 }"
+        out="${out%%,*}"
     elif have dbus-send; then
-        dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
-            org.freedesktop.DBus.NameHasOwner string:"$DBUS_NAME" 2>/dev/null | grep -q true
-    elif [ -x "$BIN" ]; then
-        "$BIN" --status >/dev/null 2>&1
+        out="$(dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+            org.freedesktop.DBus.GetConnectionUnixProcessID string:"$DBUS_NAME" 2>/dev/null)" || return 1
+        out="${out##*uint32 }"
     else
-        return 1
+        out="$(pgrep -f -- "^$BIN( |\$)" | head -n 1)"
     fi
+    case "$out" in '' | *[!0-9]*) return 1 ;; esac
+    echo "$out"
+}
+
+# PID of a running instance started from *this* installation's binary.
+# An instance from another prefix or a development build is left alone.
+our_instance_pid() {
+    local pid exe
+    pid="$(instance_pid)" || return 1
+    exe="$(readlink "/proc/$pid/exe" 2>/dev/null)" || return 1
+    exe="${exe% (deleted)}"
+    [ "$exe" = "$(readlink -f "$BIN" 2>/dev/null)" ] || return 1
+    echo "$pid"
 }
 
 stop_instance() {
-    instance_running || return 1
+    local pid
+    pid="$(our_instance_pid)" || return 1
     info "Stopping the running instance"
     if have gdbus; then
         gdbus call --session --dest "$DBUS_NAME" --object-path /Reminder --method "$DBUS_NAME.Quit" >/dev/null 2>&1 || true
-    elif [ -x "$BIN" ]; then
-        "$BIN" --quit >/dev/null 2>&1 || true
+    elif have dbus-send; then
+        dbus-send --session --dest="$DBUS_NAME" /Reminder "$DBUS_NAME.Quit" >/dev/null 2>&1 || true
+    else
+        kill "$pid" 2>/dev/null || true
     fi
     for _ in $(seq 50); do
-        instance_running || return 0
+        kill -0 "$pid" 2>/dev/null || return 0
         sleep 0.1
     done
     warn "the running instance did not quit; it keeps running the old version until you restart it"
@@ -149,7 +174,7 @@ uninstall() {
     step "Uninstalling Sedentary Reminder from $PREFIX"
     stop_instance || true
     local removed=0
-    for f in "$BIN" "$DESKTOP_FILE" "$ICON_FILE" "$AUTOSTART_FILE"; do
+    for f in "$BIN" "$DESKTOP_FILE" "$ICON_FILE" "$AUTOSTART_FILE" "$SHORTCUT_FILE"; do
         if [ -e "$f" ]; then
             rm -f -- "$f"
             info "removed $f"
@@ -275,6 +300,23 @@ install_app() {
     fi
     refresh_menus
     info "Launcher: $DESKTOP_FILE"
+
+    if [ "$DESKTOP_ICON" = 1 ]; then
+        if [ -d "$DESKTOP_DIR" ]; then
+            # Desktops only run launchers that are executable (KDE, Xfce)
+            # or marked trusted (GNOME).
+            install -m 755 "$DESKTOP_FILE" "$SHORTCUT_FILE"
+            if have gio; then
+                gio set "$SHORTCUT_FILE" metadata::trusted true >/dev/null 2>&1 || true
+            fi
+            info "Desktop shortcut: $SHORTCUT_FILE"
+        else
+            info "No desktop folder ($DESKTOP_DIR); skipped the desktop shortcut."
+        fi
+    elif [ -f "$SHORTCUT_FILE" ]; then
+        rm -f -- "$SHORTCUT_FILE"
+        info "Removed the desktop shortcut"
+    fi
 
     # Start at login?
     if [ -z "$AUTOSTART" ]; then

@@ -364,6 +364,9 @@ void App::createTray()
     m_menu->addSeparator();
     m_menu->addAction(QStringLiteral("Status and statistics…"), this, &App::showMainWindow);
     m_menu->addAction(QStringLiteral("Settings…"), this, &App::showSettings);
+    m_autostartAction = m_menu->addAction(QStringLiteral("Start at login"));
+    m_autostartAction->setCheckable(true);
+    connect(m_autostartAction, &QAction::triggered, this, &App::setAutostart);
     m_menu->addSeparator();
     m_menu->addAction(QStringLiteral("Quit"), this, &App::quit);
     connect(m_menu, &QMenu::aboutToShow, this, &App::updateMenu);
@@ -450,6 +453,8 @@ void App::updateMenu()
     m_resetAction->setVisible(state != Scheduler::State::OnBreak && state != Scheduler::State::Away);
     m_pauseMenuAction->setVisible(!m_scheduler.isPaused());
     m_resumeAction->setVisible(m_scheduler.isPaused());
+    // The settings dialog or the command line may have changed it.
+    m_autostartAction->setChecked(Autostart::isEnabled());
 }
 
 void App::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
@@ -491,11 +496,18 @@ void App::showSettings()
         return;
 
     applySettings(dialog.settings());
-    if (dialog.autostart() != Autostart::isEnabled()
-        && !Autostart::setEnabled(dialog.autostart(), QCoreApplication::applicationFilePath())) {
+    setAutostart(dialog.autostart());
+}
+
+void App::setAutostart(bool enabled)
+{
+    if (enabled != Autostart::isEnabled()
+        && !Autostart::setEnabled(enabled, QCoreApplication::applicationFilePath())) {
+        QWidget *parent = m_mainWindow && m_mainWindow->isVisible() ? m_mainWindow.data() : nullptr;
         QMessageBox::warning(parent, QStringLiteral("Sedentary Reminder"),
                              QStringLiteral("Could not update %1.").arg(Autostart::entryPath()));
     }
+    updateMenu();
 }
 
 void App::applySettings(const Settings &settings)

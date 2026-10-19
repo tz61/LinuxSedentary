@@ -36,6 +36,7 @@ public Q_SLOTS:
     void showMainWindow();
     void showSettings();
     void pauseMinutes(int minutes);
+    void setAutostart(bool enabled);
     void quit();
 
 private Q_SLOTS:
@@ -88,6 +89,7 @@ private:
     QAction *m_resetAction = nullptr;
     QAction *m_pauseMenuAction = nullptr;
     QAction *m_resumeAction = nullptr;
+    QAction *m_autostartAction = nullptr;
     QString m_trayKey;
     QString m_tooltip;
 
