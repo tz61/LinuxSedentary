@@ -4,8 +4,12 @@
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
+#include <QSaveFile>
+#include <QSet>
 #include <QStandardPaths>
 #include <QSystemTrayIcon>
 
@@ -14,17 +18,65 @@ namespace {
 const QString kService = QStringLiteral("org.freedesktop.Notifications");
 const QString kPath = QStringLiteral("/org/freedesktop/Notifications");
 
-QString soundFile(const QString &name)
+const char *soundName(Notifier::Sound sound)
 {
-    const QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
-    for (const QString &dir : dirs) {
-        for (const char *ext : {".oga", ".ogg", ".wav"}) {
-            const QString path = dir + QStringLiteral("/sounds/freedesktop/stereo/") + name + QLatin1String(ext);
-            if (QFileInfo::exists(path))
-                return path;
-        }
+    switch (sound) {
+    case Notifier::Sound::PreWarning:
+        return "prewarn";
+    case Notifier::Sound::Reminder:
+        return "reminder";
+    case Notifier::Sound::BreakStart:
+        return "break-start";
+    case Notifier::Sound::BreakOver:
+        break;
     }
-    return {};
+    return "break-over";
+}
+
+struct Player {
+    const char *program;
+    QStringList args;
+};
+
+// paplay first: it works with PulseAudio and with PipeWire's Pulse layer,
+// whereas pw-play fails on a plain PulseAudio system.
+const QVector<Player> &players()
+{
+    static const QVector<Player> list = {
+        {"paplay", {}},
+        {"pw-play", {}},
+        {"aplay", {QStringLiteral("-q")}},
+        {"canberra-gtk-play", {QStringLiteral("-f")}},
+    };
+    return list;
+}
+
+// Tries the players in turn until one exits successfully.
+void playWith(const QString &file, int index)
+{
+    for (; index < players().size(); ++index) {
+        const QString exe = QStandardPaths::findExecutable(QLatin1String(players().at(index).program));
+        if (exe.isEmpty())
+            continue;
+        auto *process = new QProcess(qApp);
+        process->setStandardOutputFile(QProcess::nullDevice());
+        process->setStandardErrorFile(QProcess::nullDevice());
+        QObject::connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), process,
+                         [process, file, index](int code, QProcess::ExitStatus status) {
+                             process->deleteLater();
+                             if (status != QProcess::NormalExit || code != 0)
+                                 playWith(file, index + 1);
+                         });
+        QObject::connect(process, &QProcess::errorOccurred, process, [process, file, index](QProcess::ProcessError e) {
+            if (e == QProcess::FailedToStart) {
+                process->deleteLater();
+                playWith(file, index + 1);
+            }
+        });
+        process->start(exe, players().at(index).args + QStringList{file});
+        return;
+    }
+    QApplication::beep();
 }
 
 } // namespace
@@ -53,6 +105,11 @@ Notifier::Notifier(QObject *parent)
                 SLOT(onActionInvoked(uint, QString)));
     bus.connect(kService, kPath, kService, QStringLiteral("NotificationClosed"), this,
                 SLOT(onClosed(uint, uint)));
+}
+
+void Notifier::setTray(QSystemTrayIcon *tray)
+{
+    m_tray = tray;
 }
 
 void Notifier::show(const QString &summary, const QString &body, const QVector<Action> &actions,
@@ -106,19 +163,39 @@ void Notifier::onClosed(uint id, uint)
         m_id = 0;
 }
 
+QString Notifier::soundFile(Sound sound)
+{
+    const QString name = QLatin1String(soundName(sound));
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)
+        + QStringLiteral("/" APP_ID "/sounds");
+    const QString path = dir + QLatin1Char('/') + name + QStringLiteral(".wav");
+
+    // Checked once per run; rewritten when missing or from another version.
+    static QSet<QString> verified;
+    if (verified.contains(name) && QFileInfo::exists(path))
+        return path;
+
+    QFile resource(QStringLiteral(":/sounds/") + name + QStringLiteral(".wav"));
+    if (!resource.open(QIODevice::ReadOnly))
+        return {};
+    const QByteArray data = resource.readAll();
+    QFile existing(path);
+    if (!existing.open(QIODevice::ReadOnly) || existing.readAll() != data) {
+        existing.close();
+        QDir().mkpath(dir);
+        QSaveFile out(path);
+        if (!out.open(QIODevice::WriteOnly) || out.write(data) != data.size() || !out.commit())
+            return {};
+    }
+    verified.insert(name);
+    return path;
+}
+
 void Notifier::play(Sound sound)
 {
-    const QString name = sound == Sound::Reminder ? QStringLiteral("bell") : QStringLiteral("complete");
-    const QString file = soundFile(name);
-    if (!file.isEmpty()) {
-        for (const char *player : {"pw-play", "paplay", "ogg123"}) {
-            const QString exe = QStandardPaths::findExecutable(QLatin1String(player));
-            if (!exe.isEmpty() && QProcess::startDetached(exe, {file}))
-                return;
-        }
-    }
-    const QString canberra = QStandardPaths::findExecutable(QStringLiteral("canberra-gtk-play"));
-    if (!canberra.isEmpty() && QProcess::startDetached(canberra, {QStringLiteral("-i"), name}))
-        return;
-    QApplication::beep();
+    const QString file = soundFile(sound);
+    if (file.isEmpty())
+        QApplication::beep();
+    else
+        playWith(file, 0);
 }

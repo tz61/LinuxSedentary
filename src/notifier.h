@@ -20,12 +20,12 @@ public:
         QString label;
     };
     enum class Urgency { Low = 0, Normal = 1, Critical = 2 };
-    enum class Sound { Reminder, BreakOver };
+    enum class Sound { PreWarning, Reminder, BreakStart, BreakOver };
 
     explicit Notifier(QObject *parent = nullptr);
 
     // Fallback when no notification server is running.
-    void setTray(QSystemTrayIcon *tray) { m_tray = tray; }
+    void setTray(QSystemTrayIcon *tray);
     bool serverAvailable() const { return m_serverAvailable; }
     bool supportsActions() const { return m_supportsActions; }
 
@@ -34,7 +34,11 @@ public:
               Urgency urgency = Urgency::Normal, int timeoutMs = -1);
     void close();
 
+    // Plays one of the built-in chimes (data/sounds) without blocking.
     static void play(Sound sound);
+    // The chime as a file on disk (players cannot read Qt resources), or
+    // empty if it could not be written.
+    static QString soundFile(Sound sound);
 
 Q_SIGNALS:
     // "default" when the notification body was clicked.

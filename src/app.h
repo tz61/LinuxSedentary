@@ -1,6 +1,7 @@
 #pragma once
 
 #include "history.h"
+#include "notifier.h"
 #include "scheduler.h"
 #include "settings.h"
 
@@ -12,7 +13,6 @@
 class BreakWindow;
 class IdleMonitor;
 class MainWindow;
-class Notifier;
 class QAction;
 class QMenu;
 class SettingsDialog;
@@ -60,6 +60,7 @@ private:
     void updateMenu();
     void applySettings(const Settings &settings);
     void closeReminders();
+    void playSound(Notifier::Sound sound);
     bool useWindow() const;
     bool snoozeAllowed() const;
     QString snoozeLabel() const;

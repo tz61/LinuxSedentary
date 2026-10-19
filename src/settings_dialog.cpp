@@ -2,14 +2,17 @@
 
 #include "autostart.h"
 #include "icons.h"
+#include "notifier.h"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace {
@@ -59,10 +62,27 @@ SettingsDialog::SettingsDialog(const Settings &settings, QWidget *parent)
     m_style->addItem(QStringLiteral("Notification only"), int(Settings::Style::Notification));
     m_style->addItem(QStringLiteral("Window with exercise tip"), int(Settings::Style::Window));
     m_style->addItem(QStringLiteral("Dim the screen"), int(Settings::Style::Fullscreen));
-    m_sound = new QCheckBox(QStringLiteral("Play a sound"), reminder);
+    m_sound = new QCheckBox(QStringLiteral("Play sounds"), reminder);
+    m_sound->setToolTip(QStringLiteral("Chimes for the early warning, the reminder, and the start and end of a break."));
+    auto *preview = new QPushButton(QStringLiteral("Listen"), reminder);
+    preview->setToolTip(QStringLiteral("Play each sound once"));
+    connect(preview, &QPushButton::clicked, this, [] {
+        // Spaced out so they do not overlap.
+        const Notifier::Sound sounds[] = {Notifier::Sound::PreWarning, Notifier::Sound::Reminder,
+                                          Notifier::Sound::BreakStart, Notifier::Sound::BreakOver};
+        int delay = 0;
+        for (Notifier::Sound sound : sounds) {
+            QTimer::singleShot(delay, [sound] { Notifier::play(sound); });
+            delay += 1800;
+        }
+    });
+    auto *soundRow = new QHBoxLayout;
+    soundRow->addWidget(m_sound);
+    soundRow->addStretch();
+    soundRow->addWidget(preview);
     m_strict = new QCheckBox(QStringLiteral("Strict mode: no skipping, one snooze per break"), reminder);
     reminderForm->addRow(QStringLiteral("Style"), m_style);
-    reminderForm->addRow(QString(), m_sound);
+    reminderForm->addRow(QString(), soundRow);
     reminderForm->addRow(QString(), m_strict);
     layout->addWidget(reminder);
 

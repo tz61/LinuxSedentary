@@ -6,6 +6,7 @@
 #include "icons.h"
 #include "idle_monitor.h"
 #include "main_window.h"
+#include "notifier.h"
 #include "scheduler.h"
 #include "settings.h"
 #include "settings_dialog.h"
@@ -13,6 +14,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QEventLoop>
+#include <QFile>
 #include <QPainter>
 #include <QPalette>
 #include <QStyleFactory>
@@ -162,6 +164,22 @@ void snapshots(const QString &theme)
     saveWidget(&dialog, QStringLiteral("settings-") + theme);
 }
 
+void checkSounds()
+{
+    for (Notifier::Sound sound : {Notifier::Sound::PreWarning, Notifier::Sound::Reminder,
+                                  Notifier::Sound::BreakStart, Notifier::Sound::BreakOver}) {
+        const QString path = Notifier::soundFile(sound);
+        QFile file(path);
+        const QByteArray header = file.open(QIODevice::ReadOnly) ? file.read(12) : QByteArray();
+        if (!header.startsWith("RIFF") || header.mid(8, 4) != "WAVE" || file.size() < 10'000) {
+            std::fprintf(stderr, "FAIL sound %d not usable at '%s'\n", int(sound), qPrintable(path));
+            ++g_failures;
+        } else {
+            std::printf("sound ok %s\n", qPrintable(path));
+        }
+    }
+}
+
 QPalette darkPalette()
 {
     QPalette p;
@@ -187,6 +205,7 @@ int main(int argc, char **argv)
     g_outDir = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QStringLiteral("snapshots");
     QDir().mkpath(g_outDir);
 
+    checkSounds();
     snapshots(QStringLiteral("light"));
     QApplication::setPalette(darkPalette());
     snapshots(QStringLiteral("dark"));

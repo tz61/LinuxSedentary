@@ -171,6 +171,7 @@ void App::onStateChanged()
 
 void App::onPreWarning(int secondsLeft)
 {
+    playSound(Notifier::Sound::PreWarning);
     QVector<Notifier::Action> actions;
     if (m_notifier->supportsActions()) {
         actions.append({QStringLiteral("start"), QStringLiteral("Take it now")});
@@ -185,8 +186,7 @@ void App::onPreWarning(int secondsLeft)
 void App::onBreakDue(int sittingSeconds, bool repeated)
 {
     Q_UNUSED(repeated)
-    if (m_settings.sound)
-        Notifier::play(Notifier::Sound::Reminder);
+    playSound(Notifier::Sound::Reminder);
 
     const int sitting = m_settings.displaySeconds(sittingSeconds);
     if (useWindow()) {
@@ -212,6 +212,7 @@ void App::onBreakDue(int sittingSeconds, bool repeated)
 
 void App::onBreakStarted(int seconds)
 {
+    playSound(Notifier::Sound::BreakStart);
     const int length = m_settings.displaySeconds(seconds);
     if (useWindow()) {
         m_notifier->close();
@@ -230,8 +231,8 @@ void App::onBreakFinished(bool completed)
 {
     m_history.addBreak(today());
     saveHistory();
-    if (completed && m_settings.sound)
-        Notifier::play(Notifier::Sound::BreakOver);
+    if (completed)
+        playSound(Notifier::Sound::BreakOver);
 
     const QString next = Format::minutesCeil(m_settings.displaySeconds(m_scheduler.config().workSeconds));
     if (m_breakWindow && m_breakWindow->isVisible()) {
@@ -273,6 +274,7 @@ void App::onNaturalBreak(int awaySeconds, bool wasDue)
     if (!wasDue)
         return;
     closeReminders();
+    playSound(Notifier::Sound::BreakOver);
     m_notifier->show(QStringLiteral("Welcome back"),
                      QStringLiteral("Your %1 away from the computer counted as a break.")
                          .arg(Format::duration(m_settings.displaySeconds(awaySeconds))),
@@ -298,6 +300,12 @@ void App::closeReminders()
     m_notifier->close();
     if (m_breakWindow && m_breakWindow->isVisible() && m_breakWindow->mode() == BreakWindow::Mode::Reminder)
         m_breakWindow->dismiss();
+}
+
+void App::playSound(Notifier::Sound sound)
+{
+    if (m_settings.sound)
+        Notifier::play(sound);
 }
 
 bool App::useWindow() const

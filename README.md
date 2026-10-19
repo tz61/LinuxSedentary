@@ -10,6 +10,8 @@ at the computer for too long, and stays out of the way otherwise.
 - **Reminds you the way you like:** a desktop notification with buttons, a
   small always-on-top card with an exercise suggestion, or a dimmed screen.
   A gentle warning comes one minute ahead; an ignored reminder repeats.
+- **Sounds:** its own soft chimes for the one-minute warning, the reminder,
+  the start of a break and its end (Settings → *Listen* plays them).
 - **Break countdown** with stretching and eye-rest tips. The card ignores input
   for a moment after it appears, so a keystroke meant for your editor cannot
   dismiss it.
@@ -96,6 +98,7 @@ only).
 | Repeat an ignored reminder every | 5 min |
 | Warning one minute ahead | on |
 | Style | window with exercise tip |
+| Sounds | on |
 
 While a reminder is showing, being away for one break length is enough to
 count as the break. Pausing silences reminders but sitting time keeps
@@ -103,6 +106,10 @@ counting, so you get reminded when the pause ends if you are overdue.
 
 Settings live in `~/.config/sedentary-reminder/settings.ini`, statistics in
 `~/.local/share/sedentary-reminder/history.json`.
+
+Sounds are built into the program and played with the first of `paplay`,
+`pw-play`, `aplay` or `canberra-gtk-play` that works (the players need a
+file, so the chimes are copied to `~/.cache/sedentary-reminder/sounds`).
 
 ## How idle detection works
 
@@ -133,6 +140,8 @@ cd build && ctest --output-on-failure
   and the statistics/settings files.
 - `gui_snapshot`: renders every window and tray-icon state offscreen into
   `build/snapshots/*.png` (light and dark); it also runs as a smoke test.
+- `tools/make_sounds.py` synthesizes the chimes in `data/sounds/` (plain
+  Python, no dependencies); edit a recipe there and rerun it to change one.
 - `./build/sedentary-reminder --fast` makes every "minute" last a second,
   handy for watching a whole cycle. Use it with
   `XDG_CONFIG_HOME`/`XDG_DATA_HOME` pointing elsewhere to keep your real
@@ -148,6 +157,6 @@ Source layout:
 | `src/app.*` | wires the scheduler to tray, windows, notifications, stats |
 | `src/break_window.*` | reminder / countdown card, dimmed-screen mode |
 | `src/main_window.*` | status window with today's numbers and the 7-day chart |
-| `src/notifier.*` | freedesktop notifications with actions, sounds |
+| `src/notifier.*` | freedesktop notifications with actions, sound playback |
 | `src/control_service.*`, `src/main.cpp` | D-Bus single instance and command line |
 | `install.sh` | per-user build and install |

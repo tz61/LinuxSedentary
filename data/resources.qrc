@@ -3,4 +3,10 @@
     <qresource prefix="/icons">
         <file>sedentary-reminder.svg</file>
     </qresource>
+    <qresource prefix="/">
+        <file>sounds/prewarn.wav</file>
+        <file>sounds/reminder.wav</file>
+        <file>sounds/break-start.wav</file>
+        <file>sounds/break-over.wav</file>
+    </qresource>
 </RCC>
