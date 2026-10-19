@@ -28,6 +28,8 @@ struct Settings {
 
     SchedulerConfig schedulerConfig() const;
     int minuteSeconds() const { return fastMode ? 1 : 60; }
+    // Scheduler seconds as the user perceives them (fast mode: seconds are minutes).
+    int displaySeconds(int seconds) const { return seconds * 60 / minuteSeconds(); }
 
     static QString styleKey(Style style);
     static Style styleFromKey(const QString &key);

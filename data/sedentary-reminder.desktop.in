@@ -1,0 +1,30 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Sedentary Reminder
+GenericName=Break Reminder
+Comment=Reminds you to stand up and move after sitting too long
+Exec="@APP_EXEC@"
+TryExec=@APP_EXEC@
+Icon=@APP_ID@
+Terminal=false
+Categories=Utility;
+Keywords=break;sitting;stand;stretch;health;posture;timer;reminder;
+StartupNotify=false
+Actions=TakeBreak;Pause;Resume;Quit;
+
+[Desktop Action TakeBreak]
+Name=Take a Break Now
+Exec="@APP_EXEC@" --take-break
+
+[Desktop Action Pause]
+Name=Pause Reminders for 1 Hour
+Exec="@APP_EXEC@" --pause 60
+
+[Desktop Action Resume]
+Name=Resume Reminders
+Exec="@APP_EXEC@" --resume
+
+[Desktop Action Quit]
+Name=Quit
+Exec="@APP_EXEC@" --quit
