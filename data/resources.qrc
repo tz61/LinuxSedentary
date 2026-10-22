@@ -8,5 +8,6 @@
         <file>sounds/reminder.wav</file>
         <file>sounds/break-start.wav</file>
         <file>sounds/break-over.wav</file>
+        <file>sounds/countdown.wav</file>
     </qresource>
 </RCC>

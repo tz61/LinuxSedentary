@@ -170,6 +170,17 @@ void Scheduler::endBreak()
         finishBreak(false);
 }
 
+void Scheduler::voidBreak()
+{
+    if (m_state != State::OnBreak)
+        return;
+    // The sitting count was left alone during the break, so the reminder
+    // cycle carries on as if the break had never been taken.
+    m_breakLeftMs = 0;
+    setState(restingState());
+    Q_EMIT breakVoided();
+}
+
 void Scheduler::snooze()
 {
     if (m_state == State::Due)

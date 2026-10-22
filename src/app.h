@@ -6,6 +6,7 @@
 #include "settings.h"
 
 #include <QObject>
+#include <QPoint>
 #include <QPointer>
 #include <QSystemTrayIcon>
 #include <QTimer>
@@ -46,6 +47,7 @@ private Q_SLOTS:
     void onBreakDue(int sittingSeconds, bool repeated);
     void onBreakStarted(int seconds);
     void onBreakFinished(bool completed);
+    void onBreakVoided();
     void onBreakSkipped();
     void onSnoozed();
     void onManualBreak();
@@ -62,6 +64,8 @@ private:
     void applySettings(const Settings &settings);
     void closeReminders();
     void playSound(Notifier::Sound sound);
+    void playCountdownChime(bool afterBreakOver);
+    void playBreakEndChimes(bool completed);
     bool useWindow() const;
     bool snoozeAllowed() const;
     QString snoozeLabel() const;
@@ -78,6 +82,8 @@ private:
     QTimer m_trayRetry;
     int m_trayRetries = 0;
     Scheduler::State m_prevState = Scheduler::State::Working;
+    QPoint m_breakCursor;       // where the pointer was when the break started
+    bool m_chimesPending = false; // a break ended while the user was away
 
     QSystemTrayIcon *m_tray = nullptr;
     QMenu *m_menu = nullptr;

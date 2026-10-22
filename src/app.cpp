@@ -10,6 +10,7 @@
 #include "settings_dialog.h"
 
 #include <QApplication>
+#include <QCursor>
 #include <QDateTime>
 #include <QMenu>
 #include <QMessageBox>
@@ -24,6 +25,10 @@ constexpr int kTrayRetryMs = 2000;
 constexpr int kTrayRetries = 30;
 // A break hint about typing appears only after the break has run this long.
 constexpr int kActivityHintAfterSeconds = 10;
+// The break-over chime lasts about 1.6 s; the countdown chime waits for it.
+constexpr int kCountdownChimeDelayMs = 1800;
+// Input this recent means someone is at the keyboard or mouse.
+constexpr int kRecentInputSeconds = 2;
 
 QDate today()
 {
@@ -49,6 +54,7 @@ App::App(bool fastMode, QObject *parent)
     connect(&m_scheduler, &Scheduler::breakDue, this, &App::onBreakDue);
     connect(&m_scheduler, &Scheduler::breakStarted, this, &App::onBreakStarted);
     connect(&m_scheduler, &Scheduler::breakFinished, this, &App::onBreakFinished);
+    connect(&m_scheduler, &Scheduler::breakVoided, this, &App::onBreakVoided);
     connect(&m_scheduler, &Scheduler::breakSkipped, this, &App::onBreakSkipped);
     connect(&m_scheduler, &Scheduler::snoozed, this, &App::onSnoozed);
     connect(&m_scheduler, &Scheduler::manualBreak, this, &App::onManualBreak);
@@ -107,15 +113,23 @@ void App::waitForTray()
 void App::tick()
 {
     const int idle = m_idle->idleSeconds();
+    // Moving the mouse during a break voids it.
+    if (m_scheduler.state() == Scheduler::State::OnBreak && QCursor::pos() != m_breakCursor)
+        m_scheduler.voidBreak();
     const int inhibitCheckFrom = std::min(30, m_scheduler.config().awaySeconds / 2);
     const bool inhibited = m_settings.respectInhibit && idle >= inhibitCheckFrom && m_idle->isIdleInhibited();
     m_scheduler.tick(QDateTime::currentMSecsSinceEpoch(), idle, m_idle->isLocked(), inhibited);
+
+    if (m_chimesPending && idle < kRecentInputSeconds) {
+        m_chimesPending = false;
+        playBreakEndChimes(true);
+    }
 
     if (m_scheduler.state() == Scheduler::State::OnBreak && m_breakWindow && m_breakWindow->isVisible()) {
         const int remaining = m_scheduler.breakRemainingSeconds();
         const int elapsed = m_scheduler.config().breakSeconds - remaining;
         m_breakWindow->updateBreak(m_settings.displaySeconds(remaining),
-                                   idle < 2 && elapsed >= kActivityHintAfterSeconds);
+                                   idle < kRecentInputSeconds && elapsed >= kActivityHintAfterSeconds);
     }
     updateTray();
     if (m_mainWindow && m_mainWindow->isVisible())
@@ -212,6 +226,7 @@ void App::onBreakDue(int sittingSeconds, bool repeated)
 
 void App::onBreakStarted(int seconds)
 {
+    m_breakCursor = QCursor::pos();
     playSound(Notifier::Sound::BreakStart);
     const int length = m_settings.displaySeconds(seconds);
     if (useWindow()) {
@@ -231,8 +246,11 @@ void App::onBreakFinished(bool completed)
 {
     m_history.addBreak(today());
     saveHistory();
-    if (completed)
-        playSound(Notifier::Sound::BreakOver);
+    // A break can run out while the user is still away: the chimes wait for them.
+    if (completed && m_idle->idleSeconds() >= kRecentInputSeconds)
+        m_chimesPending = true;
+    else
+        playBreakEndChimes(completed);
 
     const QString next = Format::minutesCeil(m_settings.displaySeconds(m_scheduler.config().workSeconds));
     if (m_breakWindow && m_breakWindow->isVisible()) {
@@ -271,6 +289,7 @@ void App::onNaturalBreak(int awaySeconds, bool wasDue)
 {
     m_history.addNaturalBreak(today());
     saveHistory();
+    playCountdownChime(wasDue);
     if (!wasDue)
         return;
     closeReminders();
@@ -306,6 +325,35 @@ void App::playSound(Notifier::Sound sound)
 {
     if (m_settings.sound)
         Notifier::play(sound);
+}
+
+// The work countdown starts again when a break ends. When the break-over
+// chime plays too, this one waits for it.
+void App::playCountdownChime(bool afterBreakOver)
+{
+    const int delayMs = afterBreakOver ? kCountdownChimeDelayMs : 0;
+    QTimer::singleShot(delayMs, this, [this] { playSound(Notifier::Sound::Countdown); });
+}
+
+// The chimes that end a break: the break-over chime for a completed break,
+// then the countdown chime.
+void App::playBreakEndChimes(bool completed)
+{
+    if (completed)
+        playSound(Notifier::Sound::BreakOver);
+    playCountdownChime(completed);
+}
+
+// The user moved the mouse during the break: it does not count, and the
+// work countdown goes on as if the break had not been taken.
+void App::onBreakVoided()
+{
+    m_chimesPending = false;
+    m_notifier->close();
+    if (m_breakWindow)
+        m_breakWindow->dismiss();
+    m_notifier->show(QStringLiteral("Break not counted"),
+                     QStringLiteral("You moved the mouse during the break."), {}, Notifier::Urgency::Normal, 6000);
 }
 
 bool App::useWindow() const

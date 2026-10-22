@@ -28,6 +28,8 @@ const char *soundName(Notifier::Sound sound)
         return "reminder";
     case Notifier::Sound::BreakStart:
         return "break-start";
+    case Notifier::Sound::Countdown:
+        return "countdown";
     case Notifier::Sound::BreakOver:
         break;
     }

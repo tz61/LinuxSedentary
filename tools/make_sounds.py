@@ -51,6 +51,8 @@ def render(notes, length, peak):
 
 
 SOUNDS = {
+    # The work countdown starts again: a soft low fourth, after the break-over chime.
+    "countdown": dict(notes=[(0.0, "G4", 0.8), (0.14, "C5", 0.9)], length=1.1, peak=0.55),
     # One minute left: a single soft note.
     "prewarn": dict(notes=[(0.0, "E5", 1.0)], length=0.9, peak=0.45),
     # Break due: an attention-catching rising pair.

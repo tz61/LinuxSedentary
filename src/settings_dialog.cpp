@@ -63,13 +63,15 @@ SettingsDialog::SettingsDialog(const Settings &settings, QWidget *parent)
     m_style->addItem(QStringLiteral("Window with exercise tip"), int(Settings::Style::Window));
     m_style->addItem(QStringLiteral("Dim the screen"), int(Settings::Style::Fullscreen));
     m_sound = new QCheckBox(QStringLiteral("Play sounds"), reminder);
-    m_sound->setToolTip(QStringLiteral("Chimes for the early warning, the reminder, and the start and end of a break."));
+    m_sound->setToolTip(QStringLiteral("Chimes for the early warning, the reminder, the start and end of a break, "
+                                       "and the next countdown starting."));
     auto *preview = new QPushButton(QStringLiteral("Listen"), reminder);
     preview->setToolTip(QStringLiteral("Play each sound once"));
     connect(preview, &QPushButton::clicked, this, [] {
         // Spaced out so they do not overlap.
         const Notifier::Sound sounds[] = {Notifier::Sound::PreWarning, Notifier::Sound::Reminder,
-                                          Notifier::Sound::BreakStart, Notifier::Sound::BreakOver};
+                                          Notifier::Sound::BreakStart, Notifier::Sound::BreakOver,
+                                          Notifier::Sound::Countdown};
         int delay = 0;
         for (Notifier::Sound sound : sounds) {
             QTimer::singleShot(delay, [sound] { Notifier::play(sound); });

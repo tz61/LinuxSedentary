@@ -207,6 +207,25 @@ private Q_SLOTS:
         QCOMPARE(sim.s.sittingSeconds(), 0);
     }
 
+    void mouseDuringBreakVoidsIt()
+    {
+        Sim sim(realisticConfig());
+        QSignalSpy finished(&sim.s, &Scheduler::breakFinished);
+        QSignalSpy voided(&sim.s, &Scheduler::breakVoided);
+        sim.active(300);
+        sim.s.startBreak();
+        sim.active(30);
+        sim.s.voidBreak();
+        QCOMPARE(sim.s.state(), Scheduler::State::Working);
+        QCOMPARE(voided.count(), 1);
+        QCOMPARE(finished.count(), 0);
+        QCOMPARE(sim.s.sittingSeconds(), 300);
+
+        // Not on a break any more: nothing happens.
+        sim.s.voidBreak();
+        QCOMPARE(voided.count(), 1);
+    }
+
     void longIdleCountsAsNaturalBreak()
     {
         Sim sim(realisticConfig());

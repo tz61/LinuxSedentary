@@ -11,7 +11,8 @@ at the computer for too long, and stays out of the way otherwise.
   small always-on-top card with an exercise suggestion, or a dimmed screen.
   A gentle warning comes one minute ahead; an ignored reminder repeats.
 - **Sounds:** its own soft chimes for the one-minute warning, the reminder,
-  the start of a break and its end (Settings → *Listen* plays them).
+  the start of a break, its end, and the next countdown starting (Settings →
+  *Listen* plays them).
 - **Break countdown** with stretching and eye-rest tips. The card ignores input
   for a moment after it appears, so a keystroke meant for your editor cannot
   dismiss it.
@@ -103,8 +104,9 @@ only).
 | Sounds | on |
 
 While a reminder is showing, being away for one break length is enough to
-count as the break. Pausing silences reminders but sitting time keeps
-counting, so you get reminded when the pause ends if you are overdue.
+count as the break. A timer break is void if you move the mouse during it.
+Pausing silences reminders but sitting time keeps counting, so you get
+reminded when the pause ends if you are overdue.
 
 Settings live in `~/.config/sedentary-reminder/settings.ini`, statistics in
 `~/.local/share/sedentary-reminder/history.json`.

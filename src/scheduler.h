@@ -58,6 +58,7 @@ public:
 public Q_SLOTS:
     void startBreak();
     void endBreak();      // stop a running break early
+    void voidBreak();     // the break was disturbed (mouse moved): it does not count
     void snooze();
     void skip();
     void reset();         // "I just took a break"
@@ -70,6 +71,8 @@ Q_SIGNALS:
     void breakDue(int sittingSeconds, bool repeated);
     void breakStarted(int seconds);
     void breakFinished(bool completed);
+    // A break that was disturbed and does not count; the work cycle goes on.
+    void breakVoided();
     void breakSkipped();
     void snoozed(int seconds);
     void manualBreak();

@@ -167,7 +167,8 @@ void snapshots(const QString &theme)
 void checkSounds()
 {
     for (Notifier::Sound sound : {Notifier::Sound::PreWarning, Notifier::Sound::Reminder,
-                                  Notifier::Sound::BreakStart, Notifier::Sound::BreakOver}) {
+                                  Notifier::Sound::BreakStart, Notifier::Sound::BreakOver,
+                                  Notifier::Sound::Countdown}) {
         const QString path = Notifier::soundFile(sound);
         QFile file(path);
         const QByteArray header = file.open(QIODevice::ReadOnly) ? file.read(12) : QByteArray();

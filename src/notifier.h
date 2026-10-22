@@ -20,7 +20,7 @@ public:
         QString label;
     };
     enum class Urgency { Low = 0, Normal = 1, Critical = 2 };
-    enum class Sound { PreWarning, Reminder, BreakStart, BreakOver };
+    enum class Sound { PreWarning, Reminder, BreakStart, BreakOver, Countdown };
 
     explicit Notifier(QObject *parent = nullptr);
 
